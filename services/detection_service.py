@@ -50,5 +50,6 @@ def detect_file(file_path):
     return {
         "file_type": "fixed_width",
         "delimiter": None,
-        "record_types": record_types
+        "record_types": record_types,
+        "sample_lines": sample
     }
