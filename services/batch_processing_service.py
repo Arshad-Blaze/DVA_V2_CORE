@@ -4,6 +4,14 @@ import pandas as pd
 from engine.parser import parse_file
 
 
+SUPPORTED_EXTENSIONS = {
+    ".csv",
+    ".txt",
+    ".dat",
+    ".psv"
+}
+
+
 def process_folder(
     folder_path,
     output_path,
@@ -26,7 +34,15 @@ def process_folder(
 
         if not os.path.isfile(full_path):
             continue
+            # Skip output parquet
+        if os.path.abspath(full_path) == os.path.abspath(output_path):
+            continue
 
+        # Skip unsupported files
+        ext = os.path.splitext(filename)[1].lower()
+
+        if ext not in SUPPORTED_EXTENSIONS:
+            continue
         # prevent reading output parquet again
         if full_path == output_path:
             continue
