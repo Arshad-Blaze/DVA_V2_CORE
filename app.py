@@ -1,9 +1,17 @@
 import os
 import streamlit as st
+import pandas as pd
+
+
+from engine.layout_loader import load_layout
 
 from services.detection_service import detect_file
 from services.preview_service import preview_data
-from engine.layout_loader import load_layout
+from services.processing_service import process_file
+from services.batch_processing_service import process_folder
+from services.merge_service import process_input
+from services.load_dataframe_service import load_dataframe
+from services.storelist_service import compare_storelist
 
 st.set_page_config(
     page_title="DVA Tool",
@@ -20,6 +28,15 @@ if "detection_result" not in st.session_state:
 if "preview_df" not in st.session_state:
     st.session_state["preview_df"] = None
 
+if "process_df" not in st.session_state:
+    st.session_state["process_df"] = None
+
+if "storelist_df" not in st.session_state:
+    st.session_state["storelist_df"] = None
+
+if "storelist_result" not in st.session_state:
+    st.session_state["storelist_result"] = None
+
 # =====================================================
 # UI
 # =====================================================
@@ -35,6 +52,7 @@ workflow = st.radio(
 )
 
 input_path = None
+layout = None
 
 # =====================================================
 # ONBOARDING
@@ -52,12 +70,11 @@ if workflow == "Onboarding":
         ]
     )
 
+
     if retailer_input_type == "File":
         retailer_path = st.text_input("Retailer File")
     else:
         retailer_path = st.text_input("Retailer Folder")
-
-    storelist_path = st.text_input("Store List File")
 
     input_path = retailer_path
 
@@ -239,4 +256,126 @@ if st.session_state["preview_df"] is not None:
     st.dataframe(
         st.session_state["preview_df"],
         use_container_width=True
+    )
+
+# =====================================================
+# PROCESS
+# =====================================================
+
+if st.session_state["preview_df"] is not None:
+
+    st.subheader("Process")
+
+    output_path = st.text_input(
+        "Output Parquet Path",
+        "output.parquet"
+    )
+
+    if st.button("Process"):
+
+        detection = st.session_state["detection_result"]
+
+        try:
+            result = process_input(
+            input_path=input_path,
+            output_path=output_path,
+            layout=layout,
+            delimiter=detection.get("delimiter")
+        )
+            st.success("Processing Complete")
+
+            st.json(result)
+
+        except Exception as e:
+
+            st.error(
+                f"Processing failed: {e}"
+            )
+
+
+        process_df = pd.read_parquet(output_path).head(100)
+
+        st.session_state["process_df"] = process_df
+
+    if st.session_state["process_df"] is not None:
+
+        st.subheader("Processed Data")
+
+        st.dataframe(
+            st.session_state["process_df"],
+            use_container_width=True
+        )
+# =====================================================
+# STORE LIST COMPARISON
+# =====================================================
+
+if workflow == "Onboarding":
+
+    st.subheader("Store List Comparison")
+
+    storelist_path = st.text_input(
+        "Store List File"
+    )
+
+    if storelist_path:
+
+        try:
+
+            storelist_df = load_dataframe(
+                storelist_path
+            )
+
+            st.session_state[
+                "storelist_df"
+            ] = storelist_df
+
+            st.dataframe(
+                storelist_df.head()
+            )
+
+        except Exception as e:
+
+            st.error(
+                f"Store list load failed: {e}"
+            )
+if (
+    workflow == "Onboarding"
+    and st.session_state["process_df"] is not None
+    and st.session_state["storelist_df"] is not None
+):
+
+    retailer_df = st.session_state["process_df"]
+
+    storelist_df = st.session_state["storelist_df"]
+
+    retailer_store_col = st.selectbox(
+        "Retailer Store Column",
+        retailer_df.columns
+    )
+
+    storelist_col = st.selectbox(
+        "Store List Column",
+        storelist_df.columns
+    )
+
+    if st.button("Compare Store List"):
+
+        result = compare_storelist(
+            retailer_df=retailer_df,
+            storelist_df=storelist_df,
+            retailer_store_column=retailer_store_col,
+            storelist_column=storelist_col
+        )
+
+        st.session_state["storelist_result"] = result
+if st.session_state["storelist_result"]:
+
+    st.subheader(
+        "Store List Results"
+    )
+
+    st.json(
+        st.session_state[
+            "storelist_result"
+        ]
     )
