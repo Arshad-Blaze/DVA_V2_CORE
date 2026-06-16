@@ -8,7 +8,8 @@ def preview_data(
     layout=None,
     delimiter=None,
     start_line=1,
-    record_type=None
+    record_type=None,
+    max_rows=20
 ):
 
     df = parse_file(
@@ -16,7 +17,8 @@ def preview_data(
         layout=layout,
         delimiter=delimiter,
         start_line=start_line,
-        record_type=record_type
+        record_type=record_type,
+        max_rows=max_rows
     )
 
-    return df.head(5)
+    return df

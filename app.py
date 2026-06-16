@@ -1,167 +1,242 @@
-import streamlit as st
 import os
+import streamlit as st
 
 from services.detection_service import detect_file
 from services.preview_service import preview_data
-from services.processing_service import process_file
 from engine.layout_loader import load_layout
 
 st.set_page_config(
-    page_title="DVA v2",
+    page_title="DVA Tool",
     layout="wide"
 )
 
-st.title("DVA v2 - File Parser")
-
 # =====================================================
-# FILE INPUT
+# SESSION STATE
 # =====================================================
 
-file_path = st.text_input("Input File Path")
+if "detection_result" not in st.session_state:
+    st.session_state["detection_result"] = None
 
-start_line = st.number_input(
-    "Data Starts From Line",
-    min_value=1,
-    value=1
+if "preview_df" not in st.session_state:
+    st.session_state["preview_df"] = None
+
+# =====================================================
+# UI
+# =====================================================
+
+st.title("DVA Tool")
+
+workflow = st.radio(
+    "Select Workflow",
+    [
+        "Onboarding",
+        "Existing"
+    ]
 )
 
+input_path = None
+
 # =====================================================
-# DETECT
+# ONBOARDING
 # =====================================================
 
-if file_path and os.path.exists(file_path):
+if workflow == "Onboarding":
 
-    if st.button("Detect File"):
+    st.header("Onboarding")
 
-        result = detect_file(file_path)
+    retailer_input_type = st.radio(
+        "Retailer Input",
+        [
+            "File",
+            "Folder"
+        ]
+    )
 
-        st.session_state["detection"] = result
-
-if "detection" in st.session_state:
-
-    detection = st.session_state["detection"]
-
-    st.subheader("Detection Result")
-
-    st.json(detection)
-
-    file_type = detection["file_type"]
-
-    delimiter = detection["delimiter"]
-
-    record_types = detection["record_types"]
-
-    selected_record_type = None
-
-    if record_types:
-
-        selected_record_type = st.selectbox(
-            "Record Type",
-            ["ALL"] + record_types
-        )
-
-        if selected_record_type == "ALL":
-            selected_record_type = None
-
-    # =================================================
-    # FIXED WIDTH
-    # =================================================
-
-    layout = None
-
-    if file_type == "fixed_width":
-
-        layout_file = st.text_input(
-            "Layout CSV Path"
-        )
-
-        if layout_file:
-
-            try:
-
-                layout = load_layout(layout_file)
-
-                st.success(
-                    f"Loaded {len(layout)} fields"
-                )
-
-            except Exception as e:
-
-                st.error(str(e))
-
-    # =================================================
-    # DELIMITED
-    # =================================================
-
+    if retailer_input_type == "File":
+        retailer_path = st.text_input("Retailer File")
     else:
+        retailer_path = st.text_input("Retailer Folder")
 
-        st.success(
-            f"Detected delimiter: {delimiter}"
-        )
+    storelist_path = st.text_input("Store List File")
+
+    input_path = retailer_path
+
+    if st.button("Detect", key="onboarding_detect"):
+
+        if not input_path:
+            st.error("Please provide a file or folder path")
+            st.stop()
+
+        if os.path.isfile(input_path):
+
+            result = detect_file(input_path)
+
+        elif os.path.isdir(input_path):
+
+            files = sorted([
+                os.path.join(input_path, f)
+                for f in os.listdir(input_path)
+                if os.path.isfile(os.path.join(input_path, f))
+            ])
+
+            if not files:
+                st.error("Folder is empty")
+                st.stop()
+
+            result = detect_file(files[0])
+
+        else:
+            st.error("Invalid path")
+            st.stop()
+
+        st.session_state["detection_result"] = result
+
+# =====================================================
+# EXISTING
+# =====================================================
+
+else:
+
+    st.header("Existing")
+
+    bau_path = st.text_input("BAU File / Folder")
+
+    test_path = st.text_input("TEST File / Folder")
+
+    input_path = bau_path
+
+    if st.button("Detect", key="existing_detect"):
+
+        if not bau_path:
+            st.error("Please provide BAU path")
+            st.stop()
+
+        if os.path.isfile(bau_path):
+
+            result = detect_file(bau_path)
+
+        elif os.path.isdir(bau_path):
+
+            files = sorted([
+                os.path.join(bau_path, f)
+                for f in os.listdir(bau_path)
+                if os.path.isfile(os.path.join(bau_path, f))
+            ])
+
+            if not files:
+                st.error("Folder is empty")
+                st.stop()
+
+            result = detect_file(files[0])
+
+        else:
+            st.error("Invalid BAU path")
+            st.stop()
+
+        st.session_state["detection_result"] = result
+
+# =====================================================
+# DETECTION RESULTS
+# =====================================================
+
+if st.session_state["detection_result"]:
+
+    result = st.session_state["detection_result"]
+
+    st.subheader("Detection Results")
+
+    st.write(
+        "File Type:",
+        result.get("file_type")
+    )
+
+    st.write(
+        "Delimiter:",
+        result.get("delimiter")
+    )
+
+    st.write("Record Types:")
+
+    for r in result.get("record_types", []):
+        st.write(f"- {r}")
+
+    st.subheader("Sample Lines")
+
+    for line in result.get("sample_lines", []):
+        st.code(line)
 
     # =================================================
     # PREVIEW
     # =================================================
 
-    if st.button("Preview Data"):
-
-        try:
-
-            df = preview_data(
-                file_path=file_path,
-                layout=layout,
-                delimiter=delimiter,
-                start_line=start_line,
-                record_type=selected_record_type
-            )
-
-            st.session_state["preview_df"] = df
-
-        except Exception as e:
-
-            st.error(f"Preview failed: {e}")
-
-    if "preview_df" in st.session_state:
-
-        st.subheader("Preview")
-
-        st.dataframe(
-            st.session_state["preview_df"],
-            use_container_width=True
-        )
-
-    # =================================================
-    # PROCESS
-    # =================================================
-
-    output_path = st.text_input(
-        "Output Parquet Path",
-        "output/output.parquet"
+    preview_rows = st.number_input(
+        "Preview Rows",
+        min_value=1,
+        max_value=100,
+        value=20
+    )
+    has_header = st.checkbox(
+    "First row contains headers",
+    value=True
     )
 
-    if st.button("Process File"):
+    if result["file_type"] == "delimited":
 
-        try:
+        if st.button("Preview"):
 
-            result = process_file(
-                file_path=file_path,
-                output_path=output_path,
-                layout=layout,
-                delimiter=delimiter,
-                start_line=start_line,
-                record_type=selected_record_type
-            )
+            try:
 
-            st.success("Processing Complete")
+                df = preview_data(
+                    file_path=input_path,
+                    delimiter=result["delimiter"],
+                    max_rows=preview_rows
+                )
 
-            st.json(result)
+                st.session_state["preview_df"] = df
 
-        except Exception as e:
+            except Exception as e:
 
-            st.error(f"Processing failed: {e}")
+                st.error(
+                    f"Preview failed: {e}"
+                )
 
-else:
+    else:
 
-    if file_path:
+        layout_file = st.text_input(
+            "Layout CSV File"
+        )
 
-        st.error("File not found")
+        if st.button("Preview Fixed Width"):
+
+            try:
+
+                layout = load_layout(
+                    layout_file
+                )
+
+                df = preview_data(
+                    file_path=input_path,
+                    layout=layout,
+                    max_rows=preview_rows
+                )
+
+                st.session_state["preview_df"] = df
+
+            except Exception as e:
+
+                st.error(
+                    f"Preview failed: {e}"
+                )
+
+# =====================================================
+# PREVIEW DISPLAY
+# =====================================================
+
+if st.session_state["preview_df"] is not None:
+
+    st.subheader("Parsed Preview")
+
+    st.dataframe(
+        st.session_state["preview_df"],
+        use_container_width=True
+    )

@@ -1,0 +1,5 @@
+field,from,length,type
+store,1,4,text
+upc,5,12,text
+units,17,4,numeric
+sales,21,8,numeric

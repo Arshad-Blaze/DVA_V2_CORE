@@ -29,7 +29,8 @@ def parse_file(
     layout=None,
     delimiter=None,
     start_line=1,
-    record_type=None
+    record_type=None,
+    max_rows=None
 ):
 
     records = []
@@ -44,7 +45,10 @@ def parse_file(
 
     lines = lines[start_line - 1:]
 
-    for line in lines:
+    for i, line in enumerate(lines):
+
+        if max_rows and i >= max_rows:
+            break
 
         if not line.strip():
             continue
