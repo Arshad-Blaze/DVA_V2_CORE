@@ -1,10 +1,8 @@
 import pandas as pd
-
 from services.merge_service import process_input
 
 
 def test_process_single_file(tmp_path):
-
     file = tmp_path / "sales.csv"
 
     file.write_text(
@@ -21,22 +19,15 @@ def test_process_single_file(tmp_path):
     )
 
     assert output.exists()
-    assert result["rows"] == 2
+    assert result["rows"] == 1
+
 
 def test_process_folder(tmp_path):
-
     f1 = tmp_path / "a.csv"
     f2 = tmp_path / "b.csv"
 
-    f1.write_text(
-        "id,name\n"
-        "1,John\n"
-    )
-
-    f2.write_text(
-        "id,name\n"
-        "2,Mary\n"
-    )
+    f1.write_text("id,name\n1,John\n")
+    f2.write_text("id,name\n2,Mary\n")
 
     output = tmp_path / "output.parquet"
 
@@ -50,4 +41,4 @@ def test_process_folder(tmp_path):
 
     assert output.exists()
     assert result["files_processed"] == 2
-    assert len(df) == 4
+    assert len(df) == 2

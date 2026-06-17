@@ -1,13 +1,12 @@
 import pandas as pd
-
 from services.processing_service import process_file
 
 
 def test_parquet_round_trip(tmp_path):
-
     source = tmp_path / "input.csv"
 
     source.write_text(
+        "id,name\n"
         "100,John\n"
         "200,Jane\n"
     )
@@ -23,9 +22,7 @@ def test_parquet_round_trip(tmp_path):
     df = pd.read_parquet(target)
 
     assert len(df) == 2
-
-    assert df.iloc[0]["col_0"] == "100"
-    assert df.iloc[0]["col_1"] == "John"
-
-    assert df.iloc[1]["col_0"] == "200"
-    assert df.iloc[1]["col_1"] == "Jane"
+    assert df.iloc[0]["id"] == 100
+    assert df.iloc[0]["name"] == "John"
+    assert df.iloc[1]["id"] == 200
+    assert df.iloc[1]["name"] == "Jane"

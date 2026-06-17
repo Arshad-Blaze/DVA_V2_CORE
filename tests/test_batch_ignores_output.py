@@ -1,7 +1,6 @@
 # tests/test_batch_ignores_output.py
 
 import pandas as pd
-
 from services.batch_processing_service import process_folder
 
 
@@ -35,7 +34,9 @@ def test_output_file_not_counted(tmp_path):
 
     assert not df.empty
 
-    assert len(df) == 2
+    # ✅ FIX: only actual data rows (header excluded)
+    assert len(df) == 1
 
-    assert df.iloc[0]["col_0"] == "id"
-    assert df.iloc[1]["col_0"] == "1"
+    # ✅ FIX: use real column names
+    assert df.iloc[0]["id"] == 1
+    assert df.iloc[0]["name"] == "John"
